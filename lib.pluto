@@ -22,8 +22,8 @@ local function runWasiProgram(bytes, options = {})
 		get_num_args = || -> #options.argv,
 		get_combined_args_size = || -> options.argv:reduce(|accum, arg| -> accum + #arg + 1, 0),
 		get_arg = |addr, index| -> do
-			programInstance:write(addr, options.argv[1 + index] .. "\0")
-			return #options.argv[1 + index] + 1
+			programInstance:write(addr, options.argv[1 + index])
+			return #options.argv[1 + index]
 		end,
 
 		file_name_to_index = |addr, len| -> do

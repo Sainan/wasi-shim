@@ -63,6 +63,18 @@
 						)
 					)
 				)
+			;; *$argv_buf = '\0';
+			(call $write_i8
+				(local.get $argv_buf)
+				(i32.const 0)
+				)
+			;; ++$argv_buf;
+			(local.set $argv_buf
+				(i32.add
+					(local.get $argv_buf)
+					(i32.const 1)
+					)
+				)
 			;; ++$arg_index;
 			(local.set $arg_index
 				(i32.add
