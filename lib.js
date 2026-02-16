@@ -43,7 +43,7 @@ const runWasiProgram = async (bytes, options = {}) => {
 		},
 
 		get_num_args: () => options.argv.length,
-		get_combined_args_size: () => options.argv.reduce((accum, arg) => accum + new TextEncoder().encode(arg).length + 1, 0),
+		get_combined_args_size: () => options.argv.reduce((accum, arg) => accum + new TextEncoder().encode(arg).length, 0),
 		get_arg: (addr, index) => new TextEncoder().encodeInto(options.argv[index], new Uint8Array(memory.buffer, addr)).written,
 
 		file_name_to_index: (path, path_len) => {

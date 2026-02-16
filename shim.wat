@@ -100,7 +100,10 @@
 			)
 		(call $write_i32
 			(local.get $argv_buf_size)
-			(call $get_combined_args_size)
+			(i32.add
+				(call $get_combined_args_size)
+				(call $get_num_args) ;; include a null terminator for each arg
+				)
 			)
 		;; return WASI_ERRNO_SUCCESS;
 		(i32.const 0)
