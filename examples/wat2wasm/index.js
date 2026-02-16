@@ -11,5 +11,5 @@ runWasiProgram(fs.readFileSync("wat2wasm.wasm"), {
 		}
 		fh.write(bytes);
 	},
-	files: [ { name: "shim.wat", data: fs.readFileSync(path.resolve(__dirname, "../../shim.wat")) } ]
+	files: [ { name: "shim.wat", data: fs.readFileSync(path.resolve(__dirname, "../../shim.wat")) } ],
 }).then(() => fh.close());

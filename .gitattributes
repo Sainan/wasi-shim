@@ -1,2 +1,4 @@
-examples/*/*.wasm linguist-vendored
 shim.wasm linguist-generated
+
+# For syntax highlighting on Github
+*.pluto linguist-language=Lua

@@ -1,0 +1,8 @@
+local __dirname <const> = io.part(debug.getinfo(1, "S").source:sub(2))
+
+local runWasiProgram = dofile(__dirname .. "/../../lib.pluto")
+
+runWasiProgram(io.contents("wasm2wat.wasm"), {
+	argv = { "wasm2wat", "shim.wasm" },
+	files = { { name = "shim.wasm", data = io.contents(__dirname .. "/../../shim.wasm") } },
+})
