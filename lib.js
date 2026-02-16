@@ -4,10 +4,10 @@ const path = require("node:path");
 const shimModule = fs.promises.readFile(path.resolve(__dirname, "shim.wasm")).then(WebAssembly.compile);
 
 module.exports = async (bytes, options = {}) => {
-	if (!options.stdout) {
+	if (!options.stderr) {
 		let buf = "";
-		options.stdout = msg => {
-			buf += msg;
+		options.stderr = (bytes) => {
+			buf += new TextDecoder().decode(bytes);
 			const arr = buf.split("\n");
 			buf = arr.pop();
 			for (let i = 0; i != arr.length; ++i) {
@@ -15,7 +15,7 @@ module.exports = async (bytes, options = {}) => {
 			}
 		};
 	}
-	options.stderr ??= options.stdout;
+	options.stdout ??= options.stderr;
 	options.argv ??= [];
 	options.files ??= [];
 
@@ -36,10 +36,10 @@ module.exports = async (bytes, options = {}) => {
 		},
 
 		stdout_write: (addr, len) => {
-			options.stdout(new TextDecoder().decode(new Uint8Array(memory.buffer, addr, len)));
+			options.stdout(new Uint8Array(memory.buffer, addr, len));
 		},
 		stderr_write: (addr, len) => {
-			options.stderr(new TextDecoder().decode(new Uint8Array(memory.buffer, addr, len)));
+			options.stderr(new Uint8Array(memory.buffer, addr, len));
 		},
 
 		get_num_args: () => options.argv.length,
