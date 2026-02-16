@@ -40,54 +40,58 @@
 
 	(func (export "args_get") (param $argv i32) (param $argv_buf i32) (result i32)
 		(local $arg_index i32)
-		(loop
-			;; *$argv = $argv_buf;
-			(call $write_i32
-				(local.get $argv)
-				(local.get $argv_buf)
-				)
-			;; ++$argv;
-			(local.set $argv
-				(i32.add
-					(local.get $argv)
-					(i32.const 4)
-					)
-				)
-			;; memcpy($argv_buf, args[$arg_index], strlen(args[$arg_index])); $argv_buf += strlen(args[$arg_index]);
-			(local.set $argv_buf
-				(i32.add
-					(local.get $argv_buf)
-					(call $get_arg
-						(local.get $argv_buf)
+		(block
+			(loop
+				;; if ($arg_index == get_num_args()) break;
+				(br_if 1
+					(i32.eq
 						(local.get $arg_index)
+						(call $get_num_args)
 						)
 					)
-				)
-			;; *$argv_buf = '\0';
-			(call $write_i8
-				(local.get $argv_buf)
-				(i32.const 0)
-				)
-			;; ++$argv_buf;
-			(local.set $argv_buf
-				(i32.add
+				;; *$argv = $argv_buf;
+				(call $write_i32
+					(local.get $argv)
 					(local.get $argv_buf)
-					(i32.const 1)
 					)
-				)
-			;; ++$arg_index;
-			(local.set $arg_index
-				(i32.add
-					(local.get $arg_index)
-					(i32.const 1)
+				;; ++$argv;
+				(local.set $argv
+					(i32.add
+						(local.get $argv)
+						(i32.const 4)
+						)
 					)
-				)
-			;; if ($arg_index == get_num_args()) break;
-			(br_if 0
-				(i32.ne
-					(local.get $arg_index)
-					(call $get_num_args)
+				;; memcpy($argv_buf, args[$arg_index], strlen(args[$arg_index])); $argv_buf += strlen(args[$arg_index]);
+				(local.set $argv_buf
+					(i32.add
+						(local.get $argv_buf)
+						(call $get_arg
+							(local.get $argv_buf)
+							(local.get $arg_index)
+							)
+						)
 					)
+				;; *$argv_buf = '\0';
+				(call $write_i8
+					(local.get $argv_buf)
+					(i32.const 0)
+					)
+				;; ++$argv_buf;
+				(local.set $argv_buf
+					(i32.add
+						(local.get $argv_buf)
+						(i32.const 1)
+						)
+					)
+				;; ++$arg_index;
+				(local.set $arg_index
+					(i32.add
+						(local.get $arg_index)
+						(i32.const 1)
+						)
+					)
+				;; continue;
+				(br 0)
 				)
 			)
 		;; return WASI_ERRNO_SUCCESS;
