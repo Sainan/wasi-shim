@@ -1,0 +1,2 @@
+examples/*/*.wasm linguist-vendored
+shim.wasm linguist-generated

@@ -3,7 +3,7 @@ const path = require("node:path");
 const runWasiProgram = require("../../lib.js");
 
 let fh;
-runWasiProgram(fs.readFileSync("wat2wasm"), {
+runWasiProgram(fs.readFileSync("wat2wasm.wasm"), {
 	argv: [ "wat2wasm", "shim.wat", "--output=-" ],
 	stdout: (bytes) => {
 		if (!fh) {

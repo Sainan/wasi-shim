@@ -1,9 +1,9 @@
-const fs = require("node:fs");
-const path = require("node:path");
+const shimModule = typeof window == "undefined"
+	? require("node:fs/promises").readFile(require("node:path").resolve(__dirname, "shim.wasm")).then(WebAssembly.compile)
+	: WebAssembly.compileStreaming(fetch(new URL("shim.wasm", document.currentScript.src)))
+	;
 
-const shimModule = fs.promises.readFile(path.resolve(__dirname, "shim.wasm")).then(WebAssembly.compile);
-
-module.exports = async (bytes, options = {}) => {
+const runWasiProgram = async (bytes, options = {}) => {
 	if (!options.stderr) {
 		let buf = "";
 		options.stderr = (bytes) => {
@@ -54,11 +54,11 @@ module.exports = async (bytes, options = {}) => {
 			const filename = new TextDecoder().decode(new Uint8Array(memory.buffer, path, path_len));
 			return options.files.findIndex(file => file.name == filename);
 		},
-		file_size: (file_index) => BigInt(options.files[file_index].data.length),
+		file_size: (file_index) => BigInt(options.files[file_index].data.byteLength),
 		file_read: (file_index, offset_i64, buf, len) => {
 			const offset = Number(offset_i64);
-			const src = options.files[file_index].data;
-			const available = src.length - offset;
+			const src = new Uint8Array(options.files[file_index].data);
+			const available = src.byteLength - offset;
 			const nread = Math.min(len, available);
 			const dst = new Uint8Array(memory.buffer, buf, nread);
 			for (let i = 0; i != nread; ++i) {
@@ -72,7 +72,13 @@ module.exports = async (bytes, options = {}) => {
 		},
 	};
 	const shimInstance = await WebAssembly.instantiate(await shimModule, { glue });
-	const { instance: programInstance } = await WebAssembly.instantiate(bytes, { wasi_snapshot_preview1: shimInstance.exports });
+	let programInstance;
+	if (bytes instanceof Promise) {
+		programInstance = (await WebAssembly.instantiateStreaming(bytes, { wasi_snapshot_preview1: shimInstance.exports })).instance;
+	}
+	else {
+		programInstance = (await WebAssembly.instantiate(bytes, { wasi_snapshot_preview1: shimInstance.exports })).instance;
+	}
 	memory = programInstance.exports.memory;
 	try {
 		programInstance.exports._start();
@@ -84,3 +90,10 @@ module.exports = async (bytes, options = {}) => {
 	}
 	return exit_code;
 };
+
+if (typeof window == "undefined") {
+	module.exports = runWasiProgram;
+}
+else {
+	window.runWasiProgram = runWasiProgram;
+}

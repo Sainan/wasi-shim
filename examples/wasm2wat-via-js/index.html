@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<body>
+	<p>Result of <code>wasm2wat shim.wasm</code>:</p>
+	<textarea style="width:calc(100% - 8px);height:calc(100vh - 70px)"></textarea>
+	<script src="../../lib.js"></script>
+	<script>
+		(async () => {
+			runWasiProgram(fetch("wasm2wat.wasm"), {
+				argv: [ "wasm2wat", "shim.wasm" ],
+				stderr: (bytes) => {
+					document.querySelector("textarea").textContent += new TextDecoder().decode(bytes);
+				},
+				files: [ { name: "shim.wasm", data: await fetch("../../shim.wasm").then(x => x.arrayBuffer()) } ]
+			});
+		})();
+	</script>
+</body>
+</html>
