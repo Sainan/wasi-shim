@@ -1,31 +1,31 @@
 (module
-	(import "wasi_snapshot_preview1" "args_sizes_get" (func $args_sizes_get (param i32 i32) (result i32)))
-	(import "wasi_snapshot_preview1" "args_get" (func $args_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "environ_sizes_get" (func $environ_sizes_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "environ_get" (func $environ_get (param i32 i32) (result i32)))
 	(import "wasi_snapshot_preview1" "fd_write" (func $fd_write (param i32 i32 i32 i32) (result i32)))
 	(memory (export "memory") 1)
 	(data (i32.const 0xffff) "\n")
 	(func (export "_start")
-		(local $argc i32)
-		;;(local $argv_buf_size i32)
+		(local $environ_count i32)
+		;;(local $environ_buf_size i32)
 		(local $i i32)
 		(drop
-			(call $args_sizes_get
+			(call $environ_sizes_get
 				(i32.const 0)
 				(i32.const 4)
 				)
 			)
-		(local.set $argc (i32.load align=4 (i32.const 0)))
-		;;(local.set $argv_buf_size (i32.load align=4 (i32.const 4)))
+		(local.set $environ_count (i32.load align=4 (i32.const 0)))
+		;;(local.set $environ_buf_size (i32.load align=4 (i32.const 4)))
 		(drop
-			(call $args_get
+			(call $environ_get
 				(i32.const 0)
-				(i32.mul (i32.const 4) (local.get $argc))
+				(i32.mul (i32.const 4) (local.get $environ_count))
 				)
 			)
 		(block
 			(loop
-				;; if ($i == $argc) break;
-				(br_if 1 (i32.eq (local.get $i) (local.get $argc)))
+				;; if ($i == $environ_count) break;
+				(br_if 1 (i32.eq (local.get $i) (local.get $environ_count)))
 				;; $iovs = 0xffe0;
 				;; $iovs->base = $argv[$i];
 				(i32.store align=4 (i32.const 0xffe0) (i32.load (i32.mul (local.get $i) (i32.const 4))))

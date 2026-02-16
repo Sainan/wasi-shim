@@ -12,6 +12,10 @@
 	(import "glue" "get_num_args" (func $get_num_args (result i32)))
 	(import "glue" "get_combined_args_size" (func $get_combined_args_size (result i32)))
 	(import "glue" "get_arg" (func $get_arg (param $addr i32) (param $arg_index i32) (result i32)))
+	;; Environment variables. These functions can simply return 0.
+	(import "glue" "get_num_envs" (func $get_num_envs (result i32)))
+	(import "glue" "get_combined_envs_size" (func $get_combined_envs_size (result i32)))
+	(import "glue" "get_env" (func $get_env (param $addr i32) (param $arg_index i32) (result i32)))
 	;; Filesystem.
 	(import "glue" "file_name_to_index" (func $file_name_to_index (param $path i32) (param $path_len i32) (result i32))) ;; -1 = no such file
 	(import "glue" "file_size" (func $file_size (param $file_index i32) (result i64)))
@@ -112,20 +116,76 @@
 		;; return WASI_ERRNO_SUCCESS;
 		(i32.const 0)
 		)
-	(func (export "environ_get") (param i32 i32) (result i32)
-		(unreachable) ;; TODO
+	(func (export "environ_get") (param $envv i32) (param $env_buf i32) (result i32)
+		(local $index i32)
+		(block
+			(loop
+				;; if ($index == get_num_envs()) break;
+				(br_if 1
+					(i32.eq
+						(local.get $index)
+						(call $get_num_envs)
+						)
+					)
+				;; *$envv = $env_buf;
+				(call $write_i32
+					(local.get $envv)
+					(local.get $env_buf)
+					)
+				;; ++$envv;
+				(local.set $envv
+					(i32.add
+						(local.get $envv)
+						(i32.const 4)
+						)
+					)
+				;; memcpy($env_buf, envs[$index], strlen(envs[$index])); $env_buf += strlen(envs[$index]);
+				(local.set $env_buf
+					(i32.add
+						(local.get $env_buf)
+						(call $get_env
+							(local.get $env_buf)
+							(local.get $index)
+							)
+						)
+					)
+				;; *$env_buf = '\0';
+				(call $write_i8
+					(local.get $env_buf)
+					(i32.const 0)
+					)
+				;; ++$env_buf;
+				(local.set $env_buf
+					(i32.add
+						(local.get $env_buf)
+						(i32.const 1)
+						)
+					)
+				;; ++$index;
+				(local.set $index
+					(i32.add
+						(local.get $index)
+						(i32.const 1)
+						)
+					)
+				;; continue;
+				(br 0)
+				)
+			)
+		;; return WASI_ERRNO_SUCCESS;
+		(i32.const 0)
 		)
 	(func (export "environ_sizes_get") (param $environ_count i32) (param $environ_buf_size i32) (result i32)
-		;; TODO: Add glue hooks
-		;; *$environ_count = 0;
 		(call $write_i32
 			(local.get $environ_count)
-			(i32.const 0)
+			(call $get_num_envs)
 			)
-		;; *$environ_buf_size = 0;
 		(call $write_i32
-			(local.get $environ_count)
-			(i32.const 0)
+			(local.get $environ_buf_size)
+			(i32.add
+				(call $get_combined_envs_size)
+				(call $get_num_envs) ;; include a null terminator for each environ
+				)
 			)
 		;; return WASI_ERRNO_SUCCESS;
 		(i32.const 0)

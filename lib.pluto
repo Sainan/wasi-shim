@@ -3,9 +3,11 @@ local wasm = require "pluto:wasm"
 local shimModule = io.contents(io.part(debug.getinfo(1, "S").source:sub(2)) .. "/shim.wasm")
 
 local function runWasiProgram(bytes, options = {})
-	options.argv ??= {}
 	options.stdout ??= io.write
 	options.stderr ??= io.write
+	options.args ??= options.argv
+	options.args ??= {}
+	options.envs ??= {}
 	options.files ??= {}
 
 	local programInstance, exit_code
@@ -19,11 +21,18 @@ local function runWasiProgram(bytes, options = {})
 		stdout_write = |addr, len| -> do options.stdout(programInstance:read(addr, len)) end,
 		stderr_write = |addr, len| -> do options.stderr(programInstance:read(addr, len)) end,
 
-		get_num_args = || -> #options.argv,
-		get_combined_args_size = || -> options.argv:reduce(|accum, arg| -> accum + #arg, 0),
+		get_num_args = || -> #options.args,
+		get_combined_args_size = || -> options.args:reduce(|accum, arg| -> accum + #arg, 0),
 		get_arg = |addr, index| -> do
-			programInstance:write(addr, options.argv[1 + index])
-			return #options.argv[1 + index]
+			programInstance:write(addr, options.args[1 + index])
+			return #options.args[1 + index]
+		end,
+
+		get_num_envs = || -> #options.envs,
+		get_combined_envs_size = || -> options.envs:reduce(|accum, env| -> accum + #env, 0),
+		get_env = |addr, index| -> do
+			programInstance:write(addr, options.envs[1 + index])
+			return #options.envs[1 + index]
 		end,
 
 		file_name_to_index = |addr, len| -> do

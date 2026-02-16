@@ -16,7 +16,9 @@ const runWasiProgram = async (bytes, options = {}) => {
 		};
 	}
 	options.stdout ??= options.stderr;
-	options.argv ??= [];
+	options.args ??= options.argv;
+	options.args ??= [];
+	options.envs ??= [];
 	options.files ??= [];
 
 	let memory, exit_code;
@@ -42,9 +44,13 @@ const runWasiProgram = async (bytes, options = {}) => {
 			options.stderr(new Uint8Array(memory.buffer, addr, len));
 		},
 
-		get_num_args: () => options.argv.length,
-		get_combined_args_size: () => options.argv.reduce((accum, arg) => accum + new TextEncoder().encode(arg).length, 0),
-		get_arg: (addr, index) => new TextEncoder().encodeInto(options.argv[index], new Uint8Array(memory.buffer, addr)).written,
+		get_num_args: () => options.args.length,
+		get_combined_args_size: () => options.args.reduce((accum, arg) => accum + new TextEncoder().encode(arg).length, 0),
+		get_arg: (addr, index) => new TextEncoder().encodeInto(options.args[index], new Uint8Array(memory.buffer, addr)).written,
+
+		get_num_envs: () => options.envs.length,
+		get_combined_envs_size: () => options.envs.reduce((accum, env) => accum + new TextEncoder().encode(env).length, 0),
+		get_env: (addr, index) => new TextEncoder().encodeInto(options.envs[index], new Uint8Array(memory.buffer, addr)).written,
 
 		file_name_to_index: (path, path_len) => {
 			const filename = new TextDecoder().decode(new Uint8Array(memory.buffer, path, path_len));
