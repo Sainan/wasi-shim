@@ -5,10 +5,6 @@ local shimModule = io.contents(io.part(debug.getinfo(1, "S").source:sub(2)) .. "
 local function runWasiProgram(bytes, options = {})
 	options.stdout ??= io.write
 	options.stderr ??= io.write
-	options.args ??= options.argv
-	options.args ??= {}
-	options.envs ??= {}
-	options.files ??= {}
 
 	local programInstance, exit_code
 	local glue = {
@@ -18,47 +14,59 @@ local function runWasiProgram(bytes, options = {})
 		write_i32 = |addr, value| -> do programInstance:write(addr, string.pack("<I4", value)) end,
 		write_i64 = |addr, value| -> do programInstance:write(addr, string.pack("<I8", value)) end,
 
-		stdout_write = |addr, len| -> do options.stdout(programInstance:read(addr, len)) end,
-		stderr_write = |addr, len| -> do options.stderr(programInstance:read(addr, len)) end,
-
-		get_num_args = || -> #options.args,
-		get_combined_args_size = || -> options.args:reduce(|accum, arg| -> accum + #arg, 0),
-		get_arg = |addr, index| -> do
-			programInstance:write(addr, options.args[1 + index])
-			return #options.args[1 + index]
-		end,
-
-		get_num_envs = || -> #options.envs,
-		get_combined_envs_size = || -> options.envs:reduce(|accum, env| -> accum + #env, 0),
-		get_env = |addr, index| -> do
-			programInstance:write(addr, options.envs[1 + index])
-			return #options.envs[1 + index]
-		end,
-
-		file_name_to_index = |addr, len| -> do
-			local name = programInstance:read(addr, len)
-			return (options.files:findindex(|file| -> file.name == name) or 0) - 1
-		end,
-		file_size = |file_index| -> #options.files[1 + file_index].data,
-		file_read = |file_index, offset, buf, len| -> do
-			local available = #options.files[1 + file_index].data - offset
-			local nread = math.min(len, available)
-			programInstance:write(buf, options.files[1 + file_index].data:span(1 + offset, nread))
-			return nread
-		end,
-
 		set_exit_code = |value| -> do
 			exit_code = value
 			error({ __wasi_exit = 1 })
 		end,
+
+		stdout_write = |addr, len| -> do options.stdout(programInstance:read(addr, len)) end,
+		stderr_write = |addr, len| -> do options.stderr(programInstance:read(addr, len)) end,
 	}
-	local shimInstance = wasm.instantiate(shimModule, $object(glue))
+
+	options.args ??= options.argv
+	if options.args then
+		glue.get_num_args = || -> #options.args
+		glue.get_combined_args_size = || -> options.args:reduce(|accum, arg| -> accum + #arg, 0)
+		glue.get_arg = |addr, index| -> do
+			programInstance:write(addr, options.args[1 + index])
+			return #options.args[1 + index]
+		end
+	end
+
+	if options.envs then
+		glue.get_num_envs = || -> #options.envs
+		glue.get_combined_envs_size = || -> options.envs:reduce(|accum, env| -> accum + #env, 0)
+		glue.get_env = |addr, index| -> do
+			programInstance:write(addr, options.envs[1 + index])
+			return #options.envs[1 + index]
+		end
+	end
+
+	if options.files then
+		glue.file_name_to_index = |addr, len| -> do
+			local name = programInstance:read(addr, len)
+			return (options.files:findindex(|file| -> file.name == name) or 0) - 1
+		end
+		glue.file_size = |file_index| -> #options.files[1 + file_index].data
+		glue.file_read = |file_index, offset, buf, len| -> do
+			local available = #options.files[1 + file_index].data - offset
+			local nread = math.min(len, available)
+			programInstance:write(buf, options.files[1 + file_index].data:span(1 + offset, nread))
+			return nread
+		end
+	end
+
+	local shimInstance = wasm.instantiate(shimModule, {
+		glue = setmetatable({}, {
+			function __index(key)
+				return glue[key] ?? (key:endswith("index") ? || -> -1 : || -> 0)
+			end
+		})
+	})
 	programInstance = wasm.instantiate(bytes, {
 		wasi_snapshot_preview1 = setmetatable({}, {
 			function __index(key)
-				--print("__index", key)
 				return function(...)
-					--print("call", key)
 					return shimInstance:call(key, ...)
 				end
 			end

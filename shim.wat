@@ -5,7 +5,9 @@
 	(import "glue" "write_i16" (func $write_i16 (param $addr i32) (param $value i32)))
 	(import "glue" "write_i32" (func $write_i32 (param $addr i32) (param $value i32)))
 	(import "glue" "write_i64" (func $write_i64 (param $addr i32) (param $value i64)))
-	;; Standard output hooks.
+	;; The final call that will be made. The VM will trap on "unreachable" afterwards.
+	(import "glue" "set_exit_code" (func $set_exit_code (param $exit_code i32)))
+	;; Standard output hooks. These functions don't need to do anything.
 	(import "glue" "stdout_write" (func $stdout_write (param $addr i32) (param $len i32)))
 	(import "glue" "stderr_write" (func $stderr_write (param $addr i32) (param $len i32)))
 	;; Arguments. These functions can simply return 0.
@@ -20,8 +22,6 @@
 	(import "glue" "file_name_to_index" (func $file_name_to_index (param $path i32) (param $path_len i32) (result i32))) ;; -1 = no such file
 	(import "glue" "file_size" (func $file_size (param $file_index i32) (result i64)))
 	(import "glue" "file_read" (func $file_read (param $file_index i32) (param $offset i64) (param $buf i32) (param $len i32) (result i32)))
-	;; The final call that will be made. The VM will trap on "unreachable" afterwards.
-	(import "glue" "set_exit_code" (func $set_exit_code (param $exit_code i32)))
 
 	(memory 1)
 	(func $file_get_offset (param $file_index i32) (result i64)

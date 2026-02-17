@@ -16,10 +16,6 @@ const runWasiProgram = async (bytes, options = {}) => {
 		};
 	}
 	options.stdout ??= options.stderr;
-	options.args ??= options.argv;
-	options.args ??= [];
-	options.envs ??= [];
-	options.files ??= [];
 
 	let memory, exit_code;
 	const glue = {
@@ -37,27 +33,38 @@ const runWasiProgram = async (bytes, options = {}) => {
 			new DataView(memory.buffer).setBigInt64(addr, value, true);
 		},
 
+		set_exit_code: (value) => {
+			exit_code = value;
+		},
+
 		stdout_write: (addr, len) => {
 			options.stdout(new Uint8Array(memory.buffer, addr, len));
 		},
 		stderr_write: (addr, len) => {
 			options.stderr(new Uint8Array(memory.buffer, addr, len));
 		},
+	};
 
-		get_num_args: () => options.args.length,
-		get_combined_args_size: () => options.args.reduce((accum, arg) => accum + new TextEncoder().encode(arg).length, 0),
-		get_arg: (addr, index) => new TextEncoder().encodeInto(options.args[index], new Uint8Array(memory.buffer, addr)).written,
+	options.args ??= options.argv;
+	if (options.args) {
+		glue.get_num_args = () => options.args.length;
+		glue.get_combined_args_size = () => options.args.reduce((accum, arg) => accum + new TextEncoder().encode(arg).length, 0);
+		glue.get_arg = (addr, index) => new TextEncoder().encodeInto(options.args[index], new Uint8Array(memory.buffer, addr)).written;
+	}
 
-		get_num_envs: () => options.envs.length,
-		get_combined_envs_size: () => options.envs.reduce((accum, env) => accum + new TextEncoder().encode(env).length, 0),
-		get_env: (addr, index) => new TextEncoder().encodeInto(options.envs[index], new Uint8Array(memory.buffer, addr)).written,
+	if (options.env) {
+		glue.get_num_envs = () => options.envs.length;
+		glue.get_combined_envs_size = () => options.envs.reduce((accum, env) => accum + new TextEncoder().encode(env).length, 0);
+		glue.get_env = (addr, index) => new TextEncoder().encodeInto(options.envs[index], new Uint8Array(memory.buffer, addr)).written;
+	}
 
-		file_name_to_index: (path, path_len) => {
+	if (options.files) {
+		glue.file_name_to_index = (path, path_len) => {
 			const filename = new TextDecoder().decode(new Uint8Array(memory.buffer, path, path_len));
 			return options.files.findIndex(file => file.name == filename);
-		},
-		file_size: (file_index) => BigInt(options.files[file_index].data.byteLength),
-		file_read: (file_index, offset_i64, buf, len) => {
+		};
+		glue.file_size = (file_index) => BigInt(options.files[file_index].data.byteLength);
+		glue.file_read = (file_index, offset_i64, buf, len) => {
 			const offset = Number(offset_i64);
 			const src = new Uint8Array(options.files[file_index].data);
 			const available = src.byteLength - offset;
@@ -67,12 +74,15 @@ const runWasiProgram = async (bytes, options = {}) => {
 				dst[i] = src[offset + i];
 			}
 			return nread;
-		},
+		};
+	}
 
-		set_exit_code: (value) => {
-			exit_code = value;
-		},
-	};
+	WebAssembly.Module.imports(await shimModule).forEach(({ module, name, kind }) => {
+		if (module == "glue" && kind == "function" && !(name in glue)) {
+			glue[name] = name.endsWith("index") ? () => -1 : () => 0;
+		}
+	});
+
 	const shimInstance = await WebAssembly.instantiate(await shimModule, { glue });
 	let programInstance;
 	if (bytes instanceof Promise) {
